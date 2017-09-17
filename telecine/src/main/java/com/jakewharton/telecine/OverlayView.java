@@ -7,24 +7,25 @@ import android.content.Context;
 import android.support.annotation.NonNull;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+
+import java.util.Locale;
+
 import butterknife.BindDimen;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
-import java.util.Locale;
-
 import static android.graphics.PixelFormat.TRANSLUCENT;
+import static android.os.Build.VERSION.SDK_INT;
+import static android.os.Build.VERSION_CODES.O;
 import static android.text.TextUtils.getLayoutDirectionFromLocale;
 import static android.view.ViewAnimationUtils.createCircularReveal;
-import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static android.view.WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR;
 import static android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
 import static android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
@@ -38,19 +39,25 @@ final class OverlayView extends FrameLayout {
   private static final int NON_COUNTDOWN_DELAY = 500;
   private static final int DURATION_ENTER_EXIT = 300;
 
+  private static boolean systemOverlayAllowed = SDK_INT < O;
+
   static OverlayView create(Context context, Listener listener, boolean showCountDown) {
     return new OverlayView(context, listener, showCountDown);
   }
 
   static WindowManager.LayoutParams createLayoutParams(Context context) {
     int width = context.getResources().getDimensionPixelSize(R.dimen.overlay_width);
+    int height = context.getResources().getDimensionPixelSize(R.dimen.overlay_height);
+    int overlayType = systemOverlayAllowed ? TYPE_SYSTEM_ERROR :
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+    int flags = FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL;
+
+    if (systemOverlayAllowed) {
+      flags = flags | FLAG_LAYOUT_NO_LIMITS | FLAG_LAYOUT_INSET_DECOR | FLAG_LAYOUT_IN_SCREEN;
+    }
 
     final WindowManager.LayoutParams params =
-        new WindowManager.LayoutParams(width, WRAP_CONTENT, TYPE_SYSTEM_ERROR, FLAG_NOT_FOCUSABLE
-            | FLAG_NOT_TOUCH_MODAL
-            | FLAG_LAYOUT_NO_LIMITS
-            | FLAG_LAYOUT_INSET_DECOR
-            | FLAG_LAYOUT_IN_SCREEN, TRANSLUCENT);
+        new WindowManager.LayoutParams(width, height, overlayType, flags, TRANSLUCENT);
     params.gravity = Gravity.TOP | gravityEndLocaleHack();
 
     return params;
@@ -113,8 +120,9 @@ final class OverlayView extends FrameLayout {
   }
 
   @Override public WindowInsets onApplyWindowInsets(WindowInsets insets) {
-    ViewGroup.LayoutParams lp = getLayoutParams();
-    lp.height = insets.getSystemWindowInsetTop();
+    if (systemOverlayAllowed) {
+      getLayoutParams().height = insets.getSystemWindowInsetTop();
+    }
 
     listener.onResize();
 
